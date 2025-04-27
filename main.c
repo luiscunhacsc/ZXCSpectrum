@@ -23,6 +23,28 @@ static uint8_t key_matrix[8];
 static int flash_counter = 0;
 static bool flash_state = false;
 
+// --- Áudio (beep melhorado)
+static bool speaker_on = false;
+static bool last_speaker_state = false;
+static float speaker_freq = 440.0f;  // Corrigido: frequência mais realista
+static float phase = 0.0f;
+static SDL_AudioDeviceID audio_dev;
+
+void audio_callback(void* userdata, Uint8* stream, int len) {
+    Sint16* buf = (Sint16*)stream;
+    int samples = len / 2;
+    for (int i = 0; i < samples; i++) {
+        if (speaker_on) {
+            buf[i] = (Sint16)((phase < 0.5f) ? 1500 : -1500); // Amplitude mais baixa
+            phase += speaker_freq / 44100.0f;
+            if (phase >= 1.0f) phase -= 1.0f;
+        } else {
+            buf[i] = 0;
+        }
+    }
+}
+// --- Fim áudio
+
 static void init_keyboard(void) {
     for (int i = 0; i < 8; i++)
         key_matrix[i] = 0x1F;
@@ -95,7 +117,14 @@ static uint8_t port_in(z80* cpu, uint8_t port_lo) {
     return res | 0xE0;
 }
 static void port_out(z80* cpu, uint8_t port_lo, uint8_t val) {
-    // Sem border; ignoramos a escrita no porto
+    if ((port_lo & 1) == 0) {
+        bool new_state = (val & 0x10) != 0;
+        if (new_state != last_speaker_state) {
+            phase = 0.0f; // Resetar fase no momento da mudança
+            last_speaker_state = new_state;
+        }
+        speaker_on = new_state;
+    }
 }
 
 static void load_rom(const char* path) {
@@ -115,10 +144,21 @@ int main(int argc, char* argv[]) {
     cpu.userdata=NULL; cpu.pc=0;
 
     SDL_SetMainReady();
-    if (SDL_Init(SDL_INIT_VIDEO)!=0){fprintf(stderr,"SDL_Init: %s\n",SDL_GetError());return 1;}
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)!=0){fprintf(stderr,"SDL_Init: %s\n",SDL_GetError());return 1;}
+
     SDL_Window* win = SDL_CreateWindow("ZX Spectrum 48K",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,WIN_W,WIN_H,0);
     SDL_Renderer* ren=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED);
     SDL_Texture* tex=SDL_CreateTexture(ren,SDL_PIXELFORMAT_ARGB8888,SDL_TEXTUREACCESS_STREAMING,SCREEN_W,SCREEN_H);
+
+    // Áudio
+    SDL_AudioSpec want = {0};
+    want.freq = 44100;
+    want.format = AUDIO_S16SYS;
+    want.channels = 1;
+    want.samples = 1024;
+    want.callback = audio_callback;
+    audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
+    SDL_PauseAudioDevice(audio_dev, 0);
 
     uint32_t framebuf[SCREEN_W*SCREEN_H];
     static const uint32_t palette[16]={
@@ -163,6 +203,7 @@ int main(int argc, char* argv[]) {
         Uint32 dt=SDL_GetTicks()-t0; if(dt<20)SDL_Delay(20-dt);
     }
 
+    SDL_CloseAudioDevice(audio_dev);
     SDL_DestroyTexture(tex); SDL_DestroyRenderer(ren); SDL_DestroyWindow(win); SDL_Quit();
     return 0;
 }
