@@ -28,15 +28,15 @@ The **ZX Spectrum-specific emulation logic** — including memory mapping, basic
 - ✅ Basic memory mapping (48KB RAM + 16KB ROM)
 - ✅ ROM loading and execution
 - ✅ Basic I/O framework (for future peripherals)
+- ✅ Video output (ULA graphics emulation, but *no border, yet*
+- ✅ Primitive sound support
 
 ---
 
 ## 🚀 Next Steps
-
-- 🔜 Full keyboard input emulation
-- 🔜 Video output (ULA graphics emulation)
-- 🔜 Sound support
-- 🔜 Loading programs (TAP/TZX file support)
+- 🔜 Border output
+- 🔜 Better Sound support
+- 🔜 Loading programs (TAP file support)
 
 ---
 
@@ -56,4 +56,3 @@ This project is licensed under the [MIT License](LICENSE), respecting the terms 
 > **Note**:  
 > The Z80 CPU core is © 2019 Nicolas Allemand, provided under the MIT License.  
 > The ZX Spectrum system code (`main.c`) was developed independently for this project.
-
